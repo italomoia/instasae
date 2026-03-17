@@ -139,7 +139,7 @@ OUTBOUND: Chatwoot callback POST → filter outgoing non-private →
 
 ## Common hurdles
 
-*(filled during development)*
+- **Port conflicts:** Dev ports 5433/6380 from original docs conflict with followup/jurispost projects on this machine. Actual dev ports: PostgreSQL=5435, Redis=6382. Always check docker-compose.yml for current ports.
 
 ## Design patterns
 

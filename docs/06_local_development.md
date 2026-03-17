@@ -32,7 +32,7 @@ services:
       POSTGRES_PASSWORD: instasae_dev
       POSTGRES_DB: instasae
     ports:
-      - "5433:5432"    # Port 5433 to avoid conflict with host PostgreSQL
+      - "5435:5432"    # Port 5435 to avoid conflict with host PostgreSQL
     volumes:
       - instasae_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -44,7 +44,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"    # Port 6380 to avoid conflict with host Redis
+      - "6382:6379"    # Port 6382 to avoid conflict with host Redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -56,7 +56,7 @@ volumes:
 ```
 
 Notes:
-- Ports are offset (5433, 6380) to avoid conflicts with PostgreSQL and Redis already running on the host for Chatwoot.
+- Ports are offset (5435, 6382) to avoid conflicts with PostgreSQL and Redis already running on the host for Chatwoot.
 - In production, instasae connects to the existing PostgreSQL and Redis instances — no separate containers.
 
 ## Environment variables
@@ -69,10 +69,10 @@ PORT=8080
 LOG_LEVEL=debug    # debug, info, warn, error
 
 # PostgreSQL
-DATABASE_URL=postgres://instasae:instasae_dev@localhost:5433/instasae?sslmode=disable
+DATABASE_URL=postgres://instasae:instasae_dev@localhost:5435/instasae?sslmode=disable
 
 # Redis
-REDIS_URL=redis://localhost:6380/0
+REDIS_URL=redis://localhost:6382/0
 
 # Meta (Instagram)
 META_APP_SECRET=your_meta_app_secret_here
@@ -199,8 +199,8 @@ Note: Repository tests require the dev PostgreSQL to be running (docker compose 
 | Service | Port | Notes |
 |---|---|---|
 | instasae | 8080 | Application HTTP server |
-| PostgreSQL (dev) | 5433 | Mapped from container 5432 → host 5433 |
-| Redis (dev) | 6380 | Mapped from container 6379 → host 6380 |
+| PostgreSQL (dev) | 5435 | Mapped from container 5432 → host 5435 |
+| Redis (dev) | 6382 | Mapped from container 6379 → host 6382 |
 
 ## Testing webhooks locally
 
