@@ -48,7 +48,7 @@ func (h *WebhookInstagramHandler) HandleWebhook(w http.ResponseWriter, r *http.R
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	slog.Debug("webhook body received", "length", len(body), "body", string(body))
+	slog.Debug("webhook body received", "length", len(body))
 
 	var payload model.IGWebhookPayload
 	if err := json.Unmarshal(body, &payload); err != nil {

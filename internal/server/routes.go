@@ -27,9 +27,8 @@ func (s *Server) RegisterRoutes(h Handlers, logger *slog.Logger) {
 		r.With(middleware.SignatureValidation(h.WebhookInstagram.IGService())).
 			Post("/instagram", h.WebhookInstagram.HandleWebhook)
 
-		// Chatwoot callback — API key auth
-		r.With(middleware.APIKeyAuth(s.cfg.AdminAPIKey)).
-			Post("/chatwoot", h.WebhookChatwoot.HandleCallback)
+		// Chatwoot callback — no auth (Chatwoot does not send API keys)
+		r.Post("/chatwoot", h.WebhookChatwoot.HandleCallback)
 	})
 
 	// Admin API — all routes require API key
