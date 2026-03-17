@@ -1,8 +1,9 @@
 package cache
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/gob"
 	"fmt"
 	"time"
 
@@ -42,17 +43,18 @@ func (c *RedisCache) GetAccount(ctx context.Context, igPageID string) (*model.Ac
 	}
 
 	var acc model.Account
-	if err := json.Unmarshal(data, &acc); err != nil {
-		return nil, fmt.Errorf("unmarshal account cache: %w", err)
+	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&acc); err != nil {
+		return nil, fmt.Errorf("decode account cache: %w", err)
 	}
 	return &acc, nil
 }
 
 func (c *RedisCache) SetAccount(ctx context.Context, igPageID string, account *model.Account, ttl time.Duration) error {
-	data, err := json.Marshal(account)
-	if err != nil {
-		return fmt.Errorf("marshal account cache: %w", err)
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(account); err != nil {
+		return fmt.Errorf("encode account cache: %w", err)
 	}
+	data := buf.Bytes()
 
 	if err := c.client.Set(ctx, keyPrefix+"account:"+igPageID, data, ttl).Err(); err != nil {
 		return fmt.Errorf("set account cache: %w", err)

@@ -123,13 +123,16 @@ func TestSetGetAccount(t *testing.T) {
 	ctx := context.Background()
 
 	want := &model.Account{
-		ID:                uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"),
-		IGPageID:          "17841451529395669",
-		IGPageName:        "Test Store",
-		ChatwootBaseURL:   "https://chat.example.com",
-		ChatwootAccountID: 1,
-		ChatwootInboxID:   5,
-		IsActive:          true,
+		ID:                 uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"),
+		IGPageID:           "17841451529395669",
+		IGPageName:         "Test Store",
+		IGAccessToken:      "ig_token_secret",
+		ChatwootBaseURL:    "https://chat.example.com",
+		ChatwootAccountID:  1,
+		ChatwootInboxID:    5,
+		ChatwootAPIToken:   "cw_token_secret",
+		WebhookVerifyToken: "verify_secret",
+		IsActive:           true,
 	}
 
 	if err := rc.SetAccount(ctx, want.IGPageID, want, 5*time.Minute); err != nil {
@@ -145,6 +148,15 @@ func TestSetGetAccount(t *testing.T) {
 	}
 	if got.ID != want.ID || got.IGPageID != want.IGPageID || got.IGPageName != want.IGPageName {
 		t.Errorf("got %+v, want %+v", got, want)
+	}
+	if got.IGAccessToken != want.IGAccessToken {
+		t.Errorf("IGAccessToken = %q, want %q", got.IGAccessToken, want.IGAccessToken)
+	}
+	if got.ChatwootAPIToken != want.ChatwootAPIToken {
+		t.Errorf("ChatwootAPIToken = %q, want %q", got.ChatwootAPIToken, want.ChatwootAPIToken)
+	}
+	if got.WebhookVerifyToken != want.WebhookVerifyToken {
+		t.Errorf("WebhookVerifyToken = %q, want %q", got.WebhookVerifyToken, want.WebhookVerifyToken)
 	}
 }
 
