@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/italomoia/instasae/internal/domain"
 	"github.com/italomoia/instasae/internal/model"
@@ -60,63 +61,75 @@ func (c *IGClient) SendAttachment(ctx context.Context, pageID string, token stri
 }
 
 func (c *IGClient) sendMessage(ctx context.Context, pageID string, token string, payload model.IGSendMessageRequest) (*model.IGSendMessageResponse, error) {
-	url := fmt.Sprintf("%s/%s/%s/messages", c.baseURL, c.apiVersion, pageID)
+	endpoint := fmt.Sprintf("%s/%s/%s/messages", c.baseURL, c.apiVersion, pageID)
 
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling send message request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("creating send message request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("sending message: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("instagram API error: status %d, body: %s", resp.StatusCode, respBody)
-	}
-
 	var result model.IGSendMessageResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decoding send message response: %w", err)
+	err = RetryDo(ctx, 3, 1*time.Second, func() error {
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if reqErr != nil {
+			return fmt.Errorf("creating send message request: %w", reqErr)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, doErr := c.httpClient.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("sending message: %w", doErr)
+		}
+		defer resp.Body.Close()
+
+		respBody, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return &HTTPError{StatusCode: resp.StatusCode, Message: string(respBody)}
+		}
+
+		if unmarshalErr := json.Unmarshal(respBody, &result); unmarshalErr != nil {
+			return fmt.Errorf("decoding send message response: %w", unmarshalErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("instagram send message: %w", err)
 	}
 	return &result, nil
 }
 
 func (c *IGClient) GetUserProfile(ctx context.Context, token string, userID string) (*model.IGUserProfile, error) {
-	url := fmt.Sprintf("%s/%s/%s?fields=name,username,profile_pic", c.baseURL, c.apiVersion, userID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating profile request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("getting user profile: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("instagram API error: status %d, body: %s", resp.StatusCode, respBody)
-	}
+	endpoint := fmt.Sprintf("%s/%s/%s?fields=name,username,profile_pic", c.baseURL, c.apiVersion, userID)
 
 	var profile model.IGUserProfile
-	if err := json.Unmarshal(respBody, &profile); err != nil {
-		return nil, fmt.Errorf("decoding profile response: %w", err)
+	err := RetryDo(ctx, 3, 1*time.Second, func() error {
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if reqErr != nil {
+			return fmt.Errorf("creating profile request: %w", reqErr)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, doErr := c.httpClient.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("getting user profile: %w", doErr)
+		}
+		defer resp.Body.Close()
+
+		respBody, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return &HTTPError{StatusCode: resp.StatusCode, Message: string(respBody)}
+		}
+
+		if unmarshalErr := json.Unmarshal(respBody, &profile); unmarshalErr != nil {
+			return fmt.Errorf("decoding profile response: %w", unmarshalErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("instagram get profile: %w", err)
 	}
 	return &profile, nil
 }

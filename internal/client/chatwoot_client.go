@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/italomoia/instasae/internal/domain"
 	"github.com/italomoia/instasae/internal/model"
@@ -62,29 +63,37 @@ func (c *CWClient) CreateMessage(ctx context.Context, baseURL string, accountID 
 	return nil
 }
 
-func (c *CWClient) doJSON(ctx context.Context, method string, url string, token string, payload any) ([]byte, error) {
+func (c *CWClient) doJSON(ctx context.Context, method string, endpoint string, token string, payload any) ([]byte, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
+	var respBody []byte
+	err = RetryDo(ctx, 3, 1*time.Second, func() error {
+		req, reqErr := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
+		if reqErr != nil {
+			return fmt.Errorf("creating request: %w", reqErr)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("api_access_token", token)
+
+		resp, doErr := c.httpClient.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("executing request: %w", doErr)
+		}
+		defer resp.Body.Close()
+
+		respBody, _ = io.ReadAll(resp.Body)
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return &HTTPError{StatusCode: resp.StatusCode, Message: string(respBody)}
+		}
+
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("api_access_token", token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("executing request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("chatwoot API error: status %d, body: %s", resp.StatusCode, respBody)
+		return nil, fmt.Errorf("chatwoot API: %w", err)
 	}
 
 	return respBody, nil
