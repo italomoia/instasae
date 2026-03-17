@@ -2,7 +2,17 @@
 
 ## About this document
 
-Describes how instasae runs in production and how to deploy/update.
+Describes how instasae runs in production on Docker Swarm and how to deploy/update.
+
+## Infrastructure
+
+- **Orchestration:** Docker Swarm
+- **Network:** IMSNet (external overlay network shared by all services)
+- **Reverse proxy:** Traefik with `letsencryptresolver` for TLS
+- **Container registry:** ghcr.io/italomoia/instasae:latest
+- **Domain:** instasae.imsdigitais.com
+- **PostgreSQL:** Existing container on IMSNet (`postgres:5432`)
+- **Redis:** Existing container on IMSNet (`redis:6379/3` — index 3; 0=default, 2=n8n, 8=evolution)
 
 ## Prerequisites on the server
 
@@ -16,17 +26,17 @@ docker exec -it <postgres_container> psql -U postgres -c "GRANT ALL PRIVILEGES O
 docker exec -it <postgres_container> psql -U postgres -d instasae -c "GRANT ALL ON SCHEMA public TO instasae;"
 
 # 2. Configure DNS
-# A record: ${INSTASAE_DOMAIN} → ${VPS_IP}
+# A record: instasae.imsdigitais.com → VPS_IP
 
-# 3. Create directory for the project
-mkdir -p /opt/instasae
+# 3. Log in to GHCR (once per machine)
+echo $GITHUB_TOKEN | docker login ghcr.io -u italomoia --password-stdin
 ```
 
 ## Dockerfile
 
 ```dockerfile
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
@@ -36,6 +46,7 @@ RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /instasae ./cmd/instasae/
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # Runtime stage
 FROM alpine:3.19
@@ -43,6 +54,7 @@ FROM alpine:3.19
 RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /instasae /usr/local/bin/instasae
+COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY migrations/ /migrations/
 
 EXPOSE 8080
@@ -53,97 +65,108 @@ ENTRYPOINT ["instasae"]
 Notes:
 - `CGO_ENABLED=0` produces a static binary — no libc dependency.
 - `-ldflags="-s -w"` strips debug symbols — smaller binary.
-- Migrations are included in the image for running on startup or via CLI.
-- Final image is ~15-20MB.
+- `migrate` CLI is included for running migrations on deploy.
+- Migrations SQL files are included in the image at `/migrations/`.
+- Final image is ~15-25MB.
 
-## Docker Compose production
+## Docker Swarm stack
+
+File: `docker-compose.prod.yml`
 
 ```yaml
+version: "3.7"
 services:
   instasae:
-    image: instasae:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    environment:
-      PORT: "8080"
-      LOG_LEVEL: "info"
-      DATABASE_URL: "postgres://instasae:STRONG_PASSWORD_HERE@postgres:5432/instasae?sslmode=disable"
-      REDIS_URL: "redis://redis:6379/2"
-      META_APP_SECRET: "${META_APP_SECRET}"
-      META_GRAPH_API_VERSION: "v25.0"
-      B2_ENDPOINT: "${B2_ENDPOINT}"
-      B2_REGION: "${B2_REGION}"
-      B2_BUCKET: "${B2_BUCKET}"
-      B2_KEY_ID: "${B2_KEY_ID}"
-      B2_APPLICATION_KEY: "${B2_APPLICATION_KEY}"
-      B2_PUBLIC_URL: "${B2_PUBLIC_URL}"
-      B2_PREFIX: "instasae"
-      ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
-      ADMIN_API_KEY: "${ADMIN_API_KEY}"
-      WEBHOOK_VERIFY_TOKEN: "${WEBHOOK_VERIFY_TOKEN}"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.instasae.rule=Host(`${INSTASAE_DOMAIN}`)"
-      - "traefik.http.routers.instasae.entrypoints=websecure"
-      - "traefik.http.routers.instasae.tls.certresolver=letsencrypt"
-      - "traefik.http.services.instasae.loadbalancer.server.port=8080"
+    image: ghcr.io/italomoia/instasae:latest
     networks:
-      - traefik_network
-      - internal
+      - IMSNet
+    environment:
+      - PORT=8080
+      - LOG_LEVEL=info
+      - DATABASE_URL=postgres://instasae:${INSTASAE_DB_PASSWORD}@postgres:5432/instasae?sslmode=disable
+      - REDIS_URL=redis://redis:6379/3
+      - META_APP_SECRET=${META_APP_SECRET}
+      - META_GRAPH_API_VERSION=v25.0
+      - B2_ENDPOINT=${B2_ENDPOINT}
+      - B2_REGION=${B2_REGION}
+      - B2_BUCKET=${B2_BUCKET}
+      - B2_KEY_ID=${B2_KEY_ID}
+      - B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
+      - B2_PUBLIC_URL=${B2_PUBLIC_URL}
+      - B2_PREFIX=instasae
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.instasae.rule=Host(`instasae.imsdigitais.com`)
+        - traefik.http.routers.instasae.entrypoints=websecure
+        - traefik.http.routers.instasae.priority=1
+        - traefik.http.routers.instasae.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.instasae.service=instasae
+        - traefik.http.services.instasae.loadbalancer.server.port=8080
+        - traefik.http.services.instasae.loadbalancer.passHostHeader=true
 
 networks:
-  traefik_network:
+  IMSNet:
     external: true
-  internal:
-    external: true
+    name: IMSNet
 ```
 
 Notes:
-- Redis uses database index 2 (`/2`) to avoid collision with Chatwoot.
-- `postgres` and `redis` hostnames refer to the existing containers on the Docker network.
-- Traefik labels configure HTTPS with automatic Let's Encrypt.
-- Networks must match the existing Traefik and internal network names.
+- Redis uses database index 3 (`/3`) — indexes 0=default, 2=n8n, 8=evolution.
+- `postgres` and `redis` hostnames resolve via the IMSNet overlay network.
+- Traefik labels configure HTTPS with automatic Let's Encrypt via `letsencryptresolver`.
+- Resource limits: 0.5 CPU, 128MB RAM.
 
-## Build and push
+## Build and push (from dev machine)
 
 ```bash
-# Build on the server (simplest approach for single VPS)
-cd /opt/instasae
-git pull origin main
-docker compose build instasae
+# Build and push to GHCR
+./deploy.sh
+
+# Or manually:
+docker build -t ghcr.io/italomoia/instasae:latest .
+docker push ghcr.io/italomoia/instasae:latest
 ```
 
-## First deploy
+## First deploy (on VPS)
 
 ```bash
-# 1. Clone to server
-cd /opt
-git clone ${REPO_URL} instasae
-cd instasae
+# 1. Set environment variables (add to /etc/environment or export)
+export INSTASAE_DB_PASSWORD="STRONG_PASSWORD_HERE"
+export META_APP_SECRET="..."
+export B2_ENDPOINT="..."
+# ... (all vars from .env.example)
 
-# 2. Create .env with production values
-cp .env.example .env
-nano .env   # fill in all STRONG_PASSWORD, keys, tokens
+# 2. Pull the image
+docker pull ghcr.io/italomoia/instasae:latest
 
-# 3. Build the image
-docker compose -f docker-compose.prod.yml build
+# 3. Run migrations
+docker run --rm --network IMSNet \
+  ghcr.io/italomoia/instasae:latest \
+  sh -c "migrate -database 'postgres://instasae:${INSTASAE_DB_PASSWORD}@postgres:5432/instasae?sslmode=disable' -path /migrations up"
 
-# 4. Run migrations
-docker compose -f docker-compose.prod.yml run --rm instasae \
-  sh -c "migrate -database '$DATABASE_URL' -path /migrations up"
+# 4. Deploy the stack
+docker stack deploy -c docker-compose.prod.yml instasae
 
-# 5. Start the service
-docker compose -f docker-compose.prod.yml up -d
-
-# 6. Verify
-curl https://${INSTASAE_DOMAIN}/health
+# 5. Verify
+curl https://instasae.imsdigitais.com/health
 # Expected: {"status":"ok",...}
 
-# 7. Configure Meta webhook
+# 6. Configure Meta webhook
 # In Meta Developer Dashboard:
-# Callback URL: https://${INSTASAE_DOMAIN}/webhook/instagram
+# Callback URL: https://instasae.imsdigitais.com/webhook/instagram
 # Verify Token: value from WEBHOOK_VERIFY_TOKEN env var
 # Subscribe to: messages
 ```
@@ -151,44 +174,47 @@ curl https://${INSTASAE_DOMAIN}/health
 ## Updating
 
 ```bash
-cd /opt/instasae
+# On dev machine:
+./deploy.sh
 
-# 1. Pull latest code
-git pull origin main
+# On VPS:
 
-# 2. Rebuild image
-docker compose -f docker-compose.prod.yml build
+# 1. Pull new image
+docker pull ghcr.io/italomoia/instasae:latest
 
-# 3. Run new migrations (if any)
-docker compose -f docker-compose.prod.yml run --rm instasae \
-  sh -c "migrate -database '$DATABASE_URL' -path /migrations up"
+# 2. Run new migrations (if any)
+docker run --rm --network IMSNet \
+  ghcr.io/italomoia/instasae:latest \
+  sh -c "migrate -database 'postgres://instasae:${INSTASAE_DB_PASSWORD}@postgres:5432/instasae?sslmode=disable' -path /migrations up"
 
-# 4. Restart with new image (graceful shutdown)
-docker compose -f docker-compose.prod.yml up -d
+# 3. Update the service (rolling update)
+docker service update --image ghcr.io/italomoia/instasae:latest instasae_instasae --force
 
-# 5. Verify
-curl https://${INSTASAE_DOMAIN}/health
-docker compose -f docker-compose.prod.yml logs --tail=20 instasae
+# 4. Verify
+curl https://instasae.imsdigitais.com/health
+docker service logs --tail=20 instasae_instasae
 ```
 
 ## Useful commands
 
 | Command | What it does |
 |---|---|
-| `docker compose -f docker-compose.prod.yml logs -f instasae` | Follow logs |
-| `docker compose -f docker-compose.prod.yml logs --tail=100 instasae` | Last 100 lines |
-| `docker compose -f docker-compose.prod.yml restart instasae` | Restart (graceful) |
-| `docker compose -f docker-compose.prod.yml stop instasae` | Stop |
-| `docker compose -f docker-compose.prod.yml ps` | Status |
-| `docker compose -f docker-compose.prod.yml exec instasae sh` | Shell into container |
+| `docker service logs -f instasae_instasae` | Follow logs |
+| `docker service logs --tail=100 instasae_instasae` | Last 100 lines |
+| `docker service update --force instasae_instasae` | Restart (rolling) |
+| `docker service scale instasae_instasae=0` | Stop |
+| `docker service scale instasae_instasae=1` | Start |
+| `docker stack ps instasae` | Status of all tasks |
+| `docker stack rm instasae` | Remove the entire stack |
 
 ## Environment variable checklist
 
 ```
+[ ] INSTASAE_DB_PASSWORD — strong password for instasae postgres user
 [ ] PORT=8080
 [ ] LOG_LEVEL=info
-[ ] DATABASE_URL — with STRONG password, pointing to existing postgres container
-[ ] REDIS_URL — pointing to existing redis container, database index /2
+[ ] DATABASE_URL — constructed from INSTASAE_DB_PASSWORD in docker-compose.prod.yml
+[ ] REDIS_URL — redis://redis:6379/3 (index 3)
 [ ] META_APP_SECRET — from Meta Developer Dashboard → App Settings → Basic
 [ ] META_GRAPH_API_VERSION — v25.0
 [ ] B2_ENDPOINT — Backblaze B2 S3-compatible endpoint
