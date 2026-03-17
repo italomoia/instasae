@@ -41,12 +41,18 @@ func (h *HealthHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		httpStatus = http.StatusServiceUnavailable
 	}
 
+	var accountsActive int
+	if pgStatus == "connected" {
+		_ = h.pool.QueryRow(ctx, "SELECT COUNT(*) FROM accounts WHERE is_active = true").Scan(&accountsActive)
+	}
+
 	uptime := int(time.Since(h.startTime).Seconds())
 
 	writeJSON(w, httpStatus, map[string]any{
-		"status":         status,
-		"postgres":       pgStatus,
-		"redis":          redisStatus,
-		"uptime_seconds": uptime,
+		"status":          status,
+		"postgres":        pgStatus,
+		"redis":           redisStatus,
+		"accounts_active": accountsActive,
+		"uptime_seconds":  uptime,
 	})
 }

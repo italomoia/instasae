@@ -318,7 +318,7 @@ func TestHealthCheck_OK(t *testing.T) {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, `{"status":"ok","postgres":"connected","redis":"connected","uptime_seconds":0}`)
+		io.WriteString(w, `{"status":"ok","postgres":"connected","redis":"connected","accounts_active":3,"uptime_seconds":0}`)
 	})
 
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -333,5 +333,8 @@ func TestHealthCheck_OK(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["status"] != "ok" {
 		t.Errorf("expected status 'ok', got '%v'", resp["status"])
+	}
+	if resp["accounts_active"] != float64(3) {
+		t.Errorf("expected accounts_active=3, got '%v'", resp["accounts_active"])
 	}
 }
