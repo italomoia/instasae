@@ -89,7 +89,7 @@ func main() {
 
 	// External clients
 	httpClient := &http.Client{Timeout: 30 * time.Second}
-	igClient := client.NewIGClient(httpClient, cfg.MetaGraphAPIVersion)
+	igClient := client.NewIGClient(httpClient, cfg.MetaGraphAPIVersion, cfg.EnableHumanAgentTag)
 	cwClient := client.NewCWClient(httpClient)
 	b2Client := client.NewB2Storage(client.B2Config{
 		Endpoint:       cfg.B2Endpoint,

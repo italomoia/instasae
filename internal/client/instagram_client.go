@@ -16,24 +16,27 @@ import (
 var _ domain.InstagramClient = (*IGClient)(nil)
 
 type IGClient struct {
-	httpClient *http.Client
-	baseURL    string
-	apiVersion string
+	httpClient       *http.Client
+	baseURL          string
+	apiVersion       string
+	enableHumanAgent bool
 }
 
-func NewIGClient(httpClient *http.Client, apiVersion string) *IGClient {
+func NewIGClient(httpClient *http.Client, apiVersion string, enableHumanAgent bool) *IGClient {
 	return &IGClient{
-		httpClient: httpClient,
-		baseURL:    "https://graph.instagram.com",
-		apiVersion: apiVersion,
+		httpClient:       httpClient,
+		baseURL:          "https://graph.instagram.com",
+		apiVersion:       apiVersion,
+		enableHumanAgent: enableHumanAgent,
 	}
 }
 
-func NewIGClientWithBaseURL(httpClient *http.Client, apiVersion string, baseURL string) *IGClient {
+func NewIGClientWithBaseURL(httpClient *http.Client, apiVersion string, baseURL string, enableHumanAgent bool) *IGClient {
 	return &IGClient{
-		httpClient: httpClient,
-		baseURL:    baseURL,
-		apiVersion: apiVersion,
+		httpClient:       httpClient,
+		baseURL:          baseURL,
+		apiVersion:       apiVersion,
+		enableHumanAgent: enableHumanAgent,
 	}
 }
 
@@ -41,7 +44,9 @@ func (c *IGClient) SendTextMessage(ctx context.Context, pageID string, token str
 	req := model.IGSendMessageRequest{
 		Recipient: model.IGParticipant{ID: recipientID},
 		Message:   model.IGSendMessage{Text: text},
-		Tag:       "HUMAN_AGENT",
+	}
+	if c.enableHumanAgent {
+		req.Tag = "HUMAN_AGENT"
 	}
 	return c.sendMessage(ctx, pageID, token, req)
 }
@@ -55,7 +60,9 @@ func (c *IGClient) SendAttachment(ctx context.Context, pageID string, token stri
 				Payload: model.IGSendAttachmentPayload{URL: url},
 			},
 		},
-		Tag: "HUMAN_AGENT",
+	}
+	if c.enableHumanAgent {
+		req.Tag = "HUMAN_AGENT"
 	}
 	return c.sendMessage(ctx, pageID, token, req)
 }

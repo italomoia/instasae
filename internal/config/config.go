@@ -22,6 +22,7 @@ type Config struct {
 	// Meta (Instagram)
 	MetaAppSecret       string `env:"META_APP_SECRET,required"`
 	MetaGraphAPIVersion string `env:"META_GRAPH_API_VERSION" envDefault:"v25.0"`
+	EnableHumanAgentTag bool   `env:"ENABLE_HUMAN_AGENT_TAG" envDefault:"false"`
 
 	// Backblaze B2 (S3-compatible)
 	B2Endpoint       string `env:"B2_ENDPOINT,required"`

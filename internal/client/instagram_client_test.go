@@ -29,7 +29,7 @@ func TestSendTextMessage_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL)
+	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL, true)
 	resp, err := c.SendTextMessage(context.Background(), "page_1", "tok_abc", "rcpt_123", "Hello!")
 	if err != nil {
 		t.Fatalf("SendTextMessage: %v", err)
@@ -62,7 +62,7 @@ func TestSendTextMessage_Error(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL)
+	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL, false)
 	_, err := c.SendTextMessage(context.Background(), "page_1", "tok", "bad", "Hi")
 	if err == nil {
 		t.Error("should return error on 400")
@@ -84,7 +84,7 @@ func TestSendAttachment_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL)
+	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL, true)
 	resp, err := c.SendAttachment(context.Background(), "page_1", "tok", "rcpt_123", "image", "https://example.com/img.jpg")
 	if err != nil {
 		t.Fatalf("SendAttachment: %v", err)
@@ -125,7 +125,7 @@ func TestGetUserProfile_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL)
+	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL, false)
 	profile, err := c.GetUserProfile(context.Background(), "tok_abc", "user_123")
 	if err != nil {
 		t.Fatalf("GetUserProfile: %v", err)
@@ -152,7 +152,7 @@ func TestGetUserProfile_Error(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL)
+	c := client.NewIGClientWithBaseURL(srv.Client(), "v25.0", srv.URL, false)
 	_, err := c.GetUserProfile(context.Background(), "bad_tok", "user_123")
 	if err == nil {
 		t.Error("should return error on 401")
