@@ -54,6 +54,22 @@ func (r *ContactRepo) Create(ctx context.Context, contact *model.Contact) (*mode
 	return created, nil
 }
 
+func (r *ContactRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.Contact, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT `+contactColumns+` FROM contacts WHERE id = $1`,
+		id,
+	)
+
+	c, err := scanContact(row)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get contact by id: %w", err)
+	}
+	return c, nil
+}
+
 func (r *ContactRepo) GetByAccountAndSender(ctx context.Context, accountID uuid.UUID, igSenderID string) (*model.Contact, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT `+contactColumns+` FROM contacts WHERE account_id = $1 AND ig_sender_id = $2`,

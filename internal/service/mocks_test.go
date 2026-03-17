@@ -102,12 +102,17 @@ func (m *mockAccountRepo) ListActiveWithExpiringTokens(ctx context.Context, with
 // ContactRepository mock
 
 type mockContactRepo struct {
-	CreateFn              func(ctx context.Context, contact *model.Contact) (*model.Contact, error)
+	CreateFn                func(ctx context.Context, contact *model.Contact) (*model.Contact, error)
+	GetByIDFn               func(ctx context.Context, id uuid.UUID) (*model.Contact, error)
 	GetByAccountAndSenderFn func(ctx context.Context, accountID uuid.UUID, igSenderID string) (*model.Contact, error)
 }
 
 func (m *mockContactRepo) Create(ctx context.Context, contact *model.Contact) (*model.Contact, error) {
 	return m.CreateFn(ctx, contact)
+}
+
+func (m *mockContactRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.Contact, error) {
+	return m.GetByIDFn(ctx, id)
 }
 
 func (m *mockContactRepo) GetByAccountAndSender(ctx context.Context, accountID uuid.UUID, igSenderID string) (*model.Contact, error) {

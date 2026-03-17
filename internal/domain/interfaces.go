@@ -23,6 +23,7 @@ type AccountRepository interface {
 
 type ContactRepository interface {
 	Create(ctx context.Context, contact *model.Contact) (*model.Contact, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*model.Contact, error)
 	GetByAccountAndSender(ctx context.Context, accountID uuid.UUID, igSenderID string) (*model.Contact, error)
 }
 
