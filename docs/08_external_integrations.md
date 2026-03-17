@@ -176,7 +176,7 @@ Authorization: Bearer {IG_ACCESS_TOKEN}
 
 | Env var | Description |
 |---|---|
-| `META_APP_SECRET` | App Secret from Meta Developer Dashboard. Used for webhook signature validation. |
+| `META_APP_SECRET` | **Facebook App Secret** from Meta Developer Dashboard → App Settings → Basic. Used for webhook signature validation (HMAC-SHA256). This is NOT the Instagram App Secret shown on the Instagram product page. |
 | `META_GRAPH_API_VERSION` | API version (v25.0). Pinned to avoid breaking changes. |
 
 Per-account in database: `ig_access_token`, `ig_page_id`.
@@ -405,3 +405,29 @@ Example: `instasae/abc123/2026-03-16/550e8400-e29b.jpg`
 [ ] Public file access enabled on bucket
 [ ] Key ID and Application Key stored in env vars
 ```
+
+---
+
+## 4. OAuth Flow (V2 — Future)
+
+**Not implemented in MVP.** For MVP, Instagram access tokens are manually obtained and inserted via the admin API.
+
+When implemented, the OAuth flow requires:
+
+| Config | Source |
+|---|---|
+| `INSTAGRAM_APP_ID` | From Instagram product page in Meta Developer Dashboard |
+| `INSTAGRAM_APP_SECRET` | From Instagram product page in Meta Developer Dashboard |
+
+**Routes:**
+- `GET /connect` — Redirects to Instagram OAuth authorization URL
+- `GET /oauth/callback` — Receives authorization code from Instagram
+- `GET /oauth/success` — Success page shown to the user after connection
+
+**Flow:**
+1. Redirect user to Instagram OAuth URL with `INSTAGRAM_APP_ID` and requested scopes
+2. Instagram redirects back to `/oauth/callback` with an authorization code
+3. Exchange code for short-lived token using `INSTAGRAM_APP_SECRET`
+4. Exchange short-lived token for long-lived token (60 days)
+5. Save encrypted long-lived token in accounts table
+6. Set `token_expires_at` to 60 days from now

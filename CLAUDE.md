@@ -140,6 +140,8 @@ OUTBOUND: Chatwoot callback POST → filter outgoing non-private →
 ## Common hurdles
 
 - **Port conflicts:** Dev ports 5433/6380 from original docs conflict with followup/jurispost projects on this machine. Actual dev ports: PostgreSQL=5435, Redis=6382. Always check docker-compose.yml for current ports.
+- **Meta App secrets:** The app has TWO secrets. `META_APP_SECRET` (for webhook signature validation) is the Facebook App Secret from "App Settings > Basic" in Meta Developer Dashboard. The Instagram App Secret (shown on the Instagram product page) is used for OAuth token exchange (V2 feature, not MVP). Do NOT confuse them.
+- **OAuth flow is V2:** Client onboarding via OAuth (routes `/connect`, `/oauth/callback`, `/oauth/success`) is not part of the MVP. For MVP, tokens are manually inserted via admin API. The Instagram App ID and Instagram App Secret are needed only for V2.
 
 ## Design patterns
 
