@@ -1,0 +1,39 @@
+services:
+  instasae:
+    image: instasae:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      LOG_LEVEL: "info"
+      DATABASE_URL: "postgres://instasae:${DB_PASSWORD}@postgres:5432/instasae?sslmode=disable"
+      REDIS_URL: "redis://redis:6379/2"
+      META_APP_SECRET: "${META_APP_SECRET}"
+      META_GRAPH_API_VERSION: "v25.0"
+      B2_ENDPOINT: "${B2_ENDPOINT}"
+      B2_REGION: "${B2_REGION}"
+      B2_BUCKET: "${B2_BUCKET}"
+      B2_KEY_ID: "${B2_KEY_ID}"
+      B2_APPLICATION_KEY: "${B2_APPLICATION_KEY}"
+      B2_PUBLIC_URL: "${B2_PUBLIC_URL}"
+      B2_PREFIX: "instasae"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
+      ADMIN_API_KEY: "${ADMIN_API_KEY}"
+      WEBHOOK_VERIFY_TOKEN: "${WEBHOOK_VERIFY_TOKEN}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.instasae.rule=Host(`${INSTASAE_DOMAIN}`)"
+      - "traefik.http.routers.instasae.entrypoints=websecure"
+      - "traefik.http.routers.instasae.tls.certresolver=letsencrypt"
+      - "traefik.http.services.instasae.loadbalancer.server.port=8080"
+    networks:
+      - traefik_network
+      - internal
+
+networks:
+  traefik_network:
+    external: true
+  internal:
+    external: true

@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.git
+.ai-jail
+docs/
+tests/
+*.md
+!go.mod
+!go.sum
+docker-compose.yml
+docker-compose.prod.yml
