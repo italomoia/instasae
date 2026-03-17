@@ -35,6 +35,7 @@ type CreateAccountParams struct {
 }
 
 type UpdateAccountParams struct {
+	IGPageID           *string    `json:"ig_page_id,omitempty"`
 	IGPageName         *string    `json:"ig_page_name,omitempty"`
 	IGAccessToken      *string    `json:"ig_access_token,omitempty"`
 	ChatwootBaseURL    *string    `json:"chatwoot_base_url,omitempty"`

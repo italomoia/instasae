@@ -35,12 +35,28 @@ func (s *AccountService) List(ctx context.Context) ([]model.Account, error) {
 }
 
 func (s *AccountService) Update(ctx context.Context, id uuid.UUID, params model.UpdateAccountParams) (*model.Account, error) {
+	// If ig_page_id is changing, get the old one to invalidate its cache
+	var oldIGPageID string
+	if params.IGPageID != nil {
+		existing, err := s.repo.GetByID(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("getting account for cache invalidation: %w", err)
+		}
+		if existing != nil {
+			oldIGPageID = existing.IGPageID
+		}
+	}
+
 	acc, err := s.repo.Update(ctx, id, params)
 	if err != nil {
 		return nil, fmt.Errorf("updating account: %w", err)
 	}
 	if acc != nil {
 		_ = s.cache.DeleteAccount(ctx, acc.IGPageID)
+		// Invalidate old ig_page_id cache if it changed
+		if oldIGPageID != "" && oldIGPageID != acc.IGPageID {
+			_ = s.cache.DeleteAccount(ctx, oldIGPageID)
+		}
 	}
 	return acc, nil
 }

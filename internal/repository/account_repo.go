@@ -140,6 +140,9 @@ func (r *AccountRepo) Update(ctx context.Context, id uuid.UUID, params model.Upd
 		argIdx++
 	}
 
+	if params.IGPageID != nil {
+		addClause("ig_page_id", *params.IGPageID)
+	}
 	if params.IGPageName != nil {
 		addClause("ig_page_name", *params.IGPageName)
 	}
