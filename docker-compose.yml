@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: instasae
+      POSTGRES_PASSWORD: instasae_dev
+      POSTGRES_DB: instasae
+    ports:
+      - "5435:5432"    # Port 5435 to avoid conflict with host PostgreSQL
+    volumes:
+      - instasae_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U instasae"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6382:6379"    # Port 6382 to avoid conflict with host Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  instasae_pgdata:
