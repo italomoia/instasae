@@ -33,7 +33,8 @@ func TestDownloadAndUpload_Success(t *testing.T) {
 	}
 
 	svc := service.NewMediaService(b2, srv.Client())
-	url, err := svc.DownloadAndUpload(context.Background(), srv.URL+"/img.jpg", "acct-123", "image/jpeg")
+	// Pass "image" (Instagram attachment type), not "image/jpeg"
+	url, err := svc.DownloadAndUpload(context.Background(), srv.URL+"/img.jpg", "acct-123", "image")
 	if err != nil {
 		t.Fatalf("DownloadAndUpload: %v", err)
 	}
@@ -46,6 +47,38 @@ func TestDownloadAndUpload_Success(t *testing.T) {
 	}
 	if uploadedCT != "image/jpeg" {
 		t.Errorf("contentType = %q, want image/jpeg", uploadedCT)
+	}
+}
+
+func TestDownloadAndUpload_FallbackContentType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Server sends generic content type
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Write([]byte("fake-video-data"))
+	}))
+	defer srv.Close()
+
+	var uploadedKey string
+	var uploadedCT string
+	b2 := &mockB2Client{
+		UploadFn: func(ctx context.Context, key string, data io.Reader, contentType string) (string, error) {
+			uploadedKey = key
+			uploadedCT = contentType
+			return "https://cdn.example.com/" + key, nil
+		},
+	}
+
+	svc := service.NewMediaService(b2, srv.Client())
+	_, err := svc.DownloadAndUpload(context.Background(), srv.URL, "acct-123", "video")
+	if err != nil {
+		t.Fatalf("DownloadAndUpload: %v", err)
+	}
+
+	if !strings.HasSuffix(uploadedKey, ".mp4") {
+		t.Errorf("key = %q, should end with .mp4 (fallback from 'video')", uploadedKey)
+	}
+	if uploadedCT != "video/mp4" {
+		t.Errorf("contentType = %q, want video/mp4", uploadedCT)
 	}
 }
 
@@ -63,7 +96,7 @@ func TestDownloadAndUpload_DownloadFails(t *testing.T) {
 	}
 
 	svc := service.NewMediaService(b2, srv.Client())
-	_, err := svc.DownloadAndUpload(context.Background(), srv.URL+"/fail", "acct-123", "image/jpeg")
+	_, err := svc.DownloadAndUpload(context.Background(), srv.URL+"/fail", "acct-123", "image")
 	if err == nil {
 		t.Error("should return error on download failure")
 	}
@@ -82,7 +115,7 @@ func TestDownloadAndUpload_UploadFails(t *testing.T) {
 	}
 
 	svc := service.NewMediaService(b2, srv.Client())
-	_, err := svc.DownloadAndUpload(context.Background(), srv.URL, "acct-123", "image/png")
+	_, err := svc.DownloadAndUpload(context.Background(), srv.URL, "acct-123", "image")
 	if err == nil {
 		t.Error("should return error on upload failure")
 	}
@@ -105,7 +138,7 @@ func TestDownloadAndUpload_TooLarge(t *testing.T) {
 	}
 
 	svc := service.NewMediaService(b2, srv.Client())
-	_, err := svc.DownloadAndUpload(context.Background(), srv.URL, "acct-123", "video/mp4")
+	_, err := svc.DownloadAndUpload(context.Background(), srv.URL, "acct-123", "video")
 	if err == nil {
 		t.Error("should return error for oversized media")
 	}

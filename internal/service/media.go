@@ -23,7 +23,7 @@ func NewMediaService(b2 domain.B2Client, httpClient *http.Client) *MediaService 
 	return &MediaService{b2: b2, httpClient: httpClient}
 }
 
-func (s *MediaService) DownloadAndUpload(ctx context.Context, sourceURL string, accountID string, contentType string) (string, error) {
+func (s *MediaService) DownloadAndUpload(ctx context.Context, sourceURL string, accountID string, attachmentType string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating download request: %w", err)
@@ -48,6 +48,12 @@ func (s *MediaService) DownloadAndUpload(ctx context.Context, sourceURL string, 
 		return "", fmt.Errorf("media too large: exceeds 25MB limit")
 	}
 
+	// Prefer Content-Type from HTTP response; fall back to Instagram attachment type
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" || contentType == "application/octet-stream" {
+		contentType = fallbackContentType(attachmentType)
+	}
+
 	ext := ContentTypeToExt(contentType)
 	date := time.Now().Format("2006-01-02")
 	key := fmt.Sprintf("%s/%s/%s.%s", accountID, date, uuid.New().String(), ext)
@@ -58,6 +64,21 @@ func (s *MediaService) DownloadAndUpload(ctx context.Context, sourceURL string, 
 	}
 
 	return publicURL, nil
+}
+
+func fallbackContentType(igType string) string {
+	switch igType {
+	case "image":
+		return "image/jpeg"
+	case "video":
+		return "video/mp4"
+	case "audio":
+		return "audio/mp4"
+	case "file":
+		return "application/octet-stream"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 func ContentTypeToExt(contentType string) string {

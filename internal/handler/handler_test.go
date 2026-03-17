@@ -150,11 +150,11 @@ func (m *mockChatwootClient) CreateMessage(ctx context.Context, baseURL string, 
 }
 
 type mockMediaHandler struct {
-	DownloadAndUploadFn func(ctx context.Context, sourceURL string, accountID string, contentType string) (string, error)
+	DownloadAndUploadFn func(ctx context.Context, sourceURL string, accountID string, attachmentType string) (string, error)
 }
 
-func (m *mockMediaHandler) DownloadAndUpload(ctx context.Context, sourceURL string, accountID string, contentType string) (string, error) {
-	return m.DownloadAndUploadFn(ctx, sourceURL, accountID, contentType)
+func (m *mockMediaHandler) DownloadAndUpload(ctx context.Context, sourceURL string, accountID string, attachmentType string) (string, error) {
+	return m.DownloadAndUploadFn(ctx, sourceURL, accountID, attachmentType)
 }
 
 // Compile-time interface checks for mocks
