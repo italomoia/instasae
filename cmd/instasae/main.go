@@ -115,6 +115,10 @@ func main() {
 		logger,
 	)
 
+	// Background jobs
+	tokenChecker := service.NewTokenChecker(accountRepo, logger, 6*time.Hour, 7*24*time.Hour)
+	tokenChecker.Start(ctx)
+
 	// Handlers
 	handlers := server.Handlers{
 		WebhookInstagram: handler.NewWebhookInstagramHandler(igSvc, cfg.WebhookVerifyToken),
