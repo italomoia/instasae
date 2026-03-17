@@ -13,8 +13,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/italomoia/instasae/internal/cache"
+	"github.com/italomoia/instasae/internal/client"
 	"github.com/italomoia/instasae/internal/config"
+	"github.com/italomoia/instasae/internal/crypto"
+	"github.com/italomoia/instasae/internal/handler"
+	"github.com/italomoia/instasae/internal/repository"
 	"github.com/italomoia/instasae/internal/server"
+	"github.com/italomoia/instasae/internal/service"
 )
 
 func main() {
@@ -25,6 +31,7 @@ func main() {
 	}
 
 	setupLogger(cfg.LogLevel)
+	logger := slog.Default()
 	slog.Info("config loaded")
 
 	ctx := context.Background()
@@ -65,8 +72,59 @@ func main() {
 	}
 	slog.Info("redis connected")
 
+	// Crypto
+	enc, err := crypto.NewEncryptor(cfg.EncryptionKey)
+	if err != nil {
+		slog.Error("failed to create encryptor", "error", err)
+		os.Exit(1)
+	}
+
+	// Repositories
+	accountRepo := repository.NewAccountRepo(pool, enc)
+	contactRepo := repository.NewContactRepo(pool)
+	convRepo := repository.NewConversationRepo(pool)
+
+	// Cache
+	redisCache := cache.NewRedisCache(redisClient)
+
+	// External clients
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	igClient := client.NewIGClient(httpClient, cfg.MetaGraphAPIVersion)
+	cwClient := client.NewCWClient(httpClient)
+	b2Client := client.NewB2Storage(client.B2Config{
+		Endpoint:       cfg.B2Endpoint,
+		Region:         cfg.B2Region,
+		Bucket:         cfg.B2Bucket,
+		KeyID:          cfg.B2KeyID,
+		ApplicationKey: cfg.B2ApplicationKey,
+		PublicURL:      cfg.B2PublicURL,
+		Prefix:         cfg.B2Prefix,
+	})
+
+	// Services
+	mediaSvc := service.NewMediaService(b2Client, httpClient)
+	accountSvc := service.NewAccountService(accountRepo, redisCache)
+	igSvc := service.NewInstagramService(
+		accountRepo, contactRepo, convRepo,
+		igClient, cwClient, redisCache, mediaSvc,
+		logger, cfg.MetaAppSecret,
+	)
+	cwSvc := service.NewChatwootService(
+		accountRepo, contactRepo, convRepo,
+		igClient, cwClient, redisCache,
+		logger,
+	)
+
+	// Handlers
+	handlers := server.Handlers{
+		WebhookInstagram: handler.NewWebhookInstagramHandler(igSvc, cfg.WebhookVerifyToken),
+		WebhookChatwoot:  handler.NewWebhookChatwootHandler(cwSvc),
+		AdminAccounts:    handler.NewAdminAccountsHandler(accountSvc),
+		Health:           handler.NewHealthHandler(pool, redisClient),
+	}
+
 	// HTTP Server
-	srv := server.NewServer(cfg)
+	srv := server.NewServer(cfg, handlers, logger)
 
 	go func() {
 		if err := srv.Start(); err != nil && err != http.ErrServerClosed {

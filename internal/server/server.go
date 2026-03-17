@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,7 +17,7 @@ type Server struct {
 	cfg        *config.Config
 }
 
-func NewServer(cfg *config.Config) *Server {
+func NewServer(cfg *config.Config, h Handlers, logger *slog.Logger) *Server {
 	r := chi.NewRouter()
 
 	s := &Server{
@@ -33,7 +32,7 @@ func NewServer(cfg *config.Config) *Server {
 		cfg:    cfg,
 	}
 
-	s.RegisterRoutes()
+	s.RegisterRoutes(h, logger)
 
 	return s
 }
@@ -46,10 +45,4 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	slog.Info("server shutting down")
 	return s.httpServer.Shutdown(ctx)
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }
