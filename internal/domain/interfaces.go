@@ -52,6 +52,12 @@ type B2Client interface {
 	Upload(ctx context.Context, key string, data io.Reader, contentType string) (string, error)
 }
 
+// Service interfaces
+
+type MediaHandler interface {
+	DownloadAndUpload(ctx context.Context, sourceURL string, accountID string, contentType string) (string, error)
+}
+
 // Cache interface
 
 type Cache interface {

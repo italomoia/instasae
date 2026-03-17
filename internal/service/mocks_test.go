@@ -183,3 +183,13 @@ func (m *mockEncryptor) Encrypt(plaintext string) (string, error) {
 func (m *mockEncryptor) Decrypt(ciphertext string) (string, error) {
 	return m.DecryptFn(ciphertext)
 }
+
+// MediaHandler mock
+
+type mockMediaHandler struct {
+	DownloadAndUploadFn func(ctx context.Context, sourceURL string, accountID string, contentType string) (string, error)
+}
+
+func (m *mockMediaHandler) DownloadAndUpload(ctx context.Context, sourceURL string, accountID string, contentType string) (string, error) {
+	return m.DownloadAndUploadFn(ctx, sourceURL, accountID, contentType)
+}
