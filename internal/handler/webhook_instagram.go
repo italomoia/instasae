@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -41,12 +42,26 @@ func (h *WebhookInstagramHandler) HandleVerification(w http.ResponseWriter, r *h
 }
 
 func (h *WebhookInstagramHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
-	var payload model.IGWebhookPayload
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		slog.Warn("failed to decode instagram webhook payload", "error", err)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		slog.Warn("failed to read webhook body", "error", err)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+	slog.Debug("webhook body received", "length", len(body))
+
+	var payload model.IGWebhookPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		preview := string(body)
+		if len(preview) > 200 {
+			preview = preview[:200]
+		}
+		slog.Warn("failed to decode instagram webhook payload", "error", err, "body_length", len(body), "body_preview", preview)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	slog.Debug("webhook payload parsed", "object", payload.Object, "entries", len(payload.Entry))
 
 	// BR-WEBHOOK-01: Respond 200 IMMEDIATELY, process async
 	w.WriteHeader(http.StatusOK)

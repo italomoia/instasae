@@ -29,6 +29,7 @@ func SignatureValidation(validator SignatureValidator) func(next http.Handler) h
 				return
 			}
 
+			slog.Debug("webhook signature valid", "body_length", len(body))
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			next.ServeHTTP(w, r)
 		})
