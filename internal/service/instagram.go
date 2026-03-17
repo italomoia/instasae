@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"path"
 	"strings"
 	"time"
 
@@ -142,16 +143,58 @@ func (s *InstagramService) processMessage(ctx context.Context, igPageID string, 
 		s.logger.Error("failed to update last_customer_message_at", "conv_id", conv.ID, "error", err)
 	}
 
-	// Build message content
-	content := s.buildMessageContent(ctx, account, msg)
-
 	// Send to Chatwoot
-	cwReq := model.CWCreateMessageRequest{
-		Content:     content,
-		MessageType: "incoming",
+	s.sendToChatwoot(ctx, account, conv, msg)
+}
+
+func (s *InstagramService) sendToChatwoot(ctx context.Context, account *model.Account, conv *model.Conversation, msg *model.IGMessage) {
+	baseURL := account.ChatwootBaseURL
+	acctID := account.ChatwootAccountID
+	token := account.ChatwootAPIToken
+	convID := conv.ChatwootConversationID
+
+	// Handle attachments
+	if len(msg.Attachments) > 0 {
+		att := msg.Attachments[0]
+		publicURL, err := s.media.DownloadAndUpload(ctx, att.Payload.URL, account.ID.String(), att.Type)
+		if err != nil {
+			s.logger.Error("media download/upload failed", "url", att.Payload.URL, "error", err)
+			// Fall back to text-only below
+		} else {
+			// Derive filename from the B2 URL extension
+			ext := path.Ext(publicURL) // e.g. ".jpg"
+			if ext == "" {
+				ext = ".bin"
+			}
+			filename := "attachment" + ext
+
+			// Send attachment via multipart
+			if err := s.cwClient.CreateMessageWithAttachment(ctx, baseURL, acctID, token, convID, "", publicURL, filename); err != nil {
+				s.logger.Error("failed to send attachment to Chatwoot, falling back to URL", "error", err)
+				// Fallback: send URL as text
+				cwReq := model.CWCreateMessageRequest{Content: publicURL, MessageType: "incoming"}
+				if msgErr := s.cwClient.CreateMessage(ctx, baseURL, acctID, token, convID, cwReq); msgErr != nil {
+					s.logger.Error("failed to send fallback URL to Chatwoot", "error", msgErr)
+				}
+			}
+
+			// If there's also text, send it as a separate message
+			if msg.Text != "" {
+				cwReq := model.CWCreateMessageRequest{Content: msg.Text, MessageType: "incoming"}
+				if err := s.cwClient.CreateMessage(ctx, baseURL, acctID, token, convID, cwReq); err != nil {
+					s.logger.Error("failed to send text to Chatwoot", "error", err)
+				}
+			}
+			return
+		}
 	}
-	if err := s.cwClient.CreateMessage(ctx, account.ChatwootBaseURL, account.ChatwootAccountID, account.ChatwootAPIToken, conv.ChatwootConversationID, cwReq); err != nil {
-		s.logger.Error("failed to send message to Chatwoot", "conv_id", conv.ChatwootConversationID, "error", err)
+
+	// Text-only message (or attachment download failed)
+	if msg.Text != "" {
+		cwReq := model.CWCreateMessageRequest{Content: msg.Text, MessageType: "incoming"}
+		if err := s.cwClient.CreateMessage(ctx, baseURL, acctID, token, convID, cwReq); err != nil {
+			s.logger.Error("failed to send message to Chatwoot", "conv_id", convID, "error", err)
+		}
 	}
 }
 
@@ -289,27 +332,6 @@ func (s *InstagramService) findOrCreateConversation(ctx context.Context, account
 	}
 
 	return created, nil
-}
-
-func (s *InstagramService) buildMessageContent(ctx context.Context, account *model.Account, msg *model.IGMessage) string {
-	// Handle attachments (BR-MEDIA-01)
-	if len(msg.Attachments) > 0 {
-		att := msg.Attachments[0]
-		if s.media != nil {
-			publicURL, err := s.media.DownloadAndUpload(ctx, att.Payload.URL, account.ID.String(), att.Type)
-			if err != nil {
-				s.logger.Error("media download/upload failed", "url", att.Payload.URL, "error", err)
-				// Fall back to text if available
-				if msg.Text != "" {
-					return msg.Text
-				}
-				return fmt.Sprintf("[%s attachment - download failed]", att.Type)
-			}
-			return publicURL
-		}
-	}
-
-	return msg.Text
 }
 
 func strPtr(s string) *string {

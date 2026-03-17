@@ -531,14 +531,16 @@ func TestInstagramService_ProcessWebhook_TextMessage(t *testing.T) {
 	}
 }
 
-// Test 10: Image attachment — downloaded, uploaded to B2, sent to Chatwoot
+// Test 10: Image attachment — downloaded, uploaded to B2, sent to Chatwoot as multipart attachment
 func TestInstagramService_ProcessWebhook_ImageAttachment(t *testing.T) {
 	account := sampleAccountForIG()
 	contact := sampleContactForIG(account.ID)
 	conv := sampleConversationForIG(account.ID, contact.ID)
 
 	var mediaDownloaded bool
-	var messageContent string
+	var attachmentSent bool
+	var sentAttachmentURL string
+	var sentFilename string
 
 	cache := &mockCache{
 		SetDedupFn: func(ctx context.Context, messageID string, ttl time.Duration) (bool, error) {
@@ -565,7 +567,7 @@ func TestInstagramService_ProcessWebhook_ImageAttachment(t *testing.T) {
 		},
 	}
 	mediaHandler := &mockMediaHandler{
-		DownloadAndUploadFn: func(ctx context.Context, sourceURL string, accountID string, contentType string) (string, error) {
+		DownloadAndUploadFn: func(ctx context.Context, sourceURL string, accountID string, attachmentType string) (string, error) {
 			mediaDownloaded = true
 			if sourceURL != "https://lookaside.fbsbx.com/ig_messaging_cdn/test.jpg" {
 				t.Errorf("unexpected source URL: %s", sourceURL)
@@ -574,8 +576,14 @@ func TestInstagramService_ProcessWebhook_ImageAttachment(t *testing.T) {
 		},
 	}
 	cwClient := &mockChatwootClient{
+		CreateMessageWithAttachmentFn: func(ctx context.Context, baseURL string, accountID int, token string, conversationID int, content string, attachmentURL string, filename string) error {
+			attachmentSent = true
+			sentAttachmentURL = attachmentURL
+			sentFilename = filename
+			return nil
+		},
 		CreateMessageFn: func(ctx context.Context, baseURL string, accountID int, token string, conversationID int, req model.CWCreateMessageRequest) error {
-			messageContent = req.Content
+			t.Error("CreateMessage should not be called for attachment-only message")
 			return nil
 		},
 	}
@@ -587,8 +595,14 @@ func TestInstagramService_ProcessWebhook_ImageAttachment(t *testing.T) {
 	if !mediaDownloaded {
 		t.Error("expected media to be downloaded and uploaded")
 	}
-	if messageContent != "https://b2.example.com/instasae/test/image.jpg" {
-		t.Errorf("expected B2 URL as message content, got '%s'", messageContent)
+	if !attachmentSent {
+		t.Error("expected attachment to be sent via CreateMessageWithAttachment")
+	}
+	if sentAttachmentURL != "https://b2.example.com/instasae/test/image.jpg" {
+		t.Errorf("expected B2 URL as attachment URL, got '%s'", sentAttachmentURL)
+	}
+	if sentFilename != "attachment.jpg" {
+		t.Errorf("expected filename 'attachment.jpg', got '%s'", sentFilename)
 	}
 }
 

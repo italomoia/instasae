@@ -47,6 +47,7 @@ type ChatwootClient interface {
 	CreateContact(ctx context.Context, baseURL string, accountID int, token string, req model.CWCreateContactRequest) (*model.CWCreateContactResponse, error)
 	CreateConversation(ctx context.Context, baseURL string, accountID int, token string, req model.CWCreateConversationRequest) (*model.CWCreateConversationResponse, error)
 	CreateMessage(ctx context.Context, baseURL string, accountID int, token string, conversationID int, req model.CWCreateMessageRequest) error
+	CreateMessageWithAttachment(ctx context.Context, baseURL string, accountID int, token string, conversationID int, content string, attachmentURL string, filename string) error
 }
 
 type B2Client interface {

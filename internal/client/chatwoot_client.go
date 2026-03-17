@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"time"
 
@@ -59,6 +60,68 @@ func (c *CWClient) CreateMessage(ctx context.Context, baseURL string, accountID 
 	_, err := c.doJSON(ctx, http.MethodPost, url, token, req)
 	if err != nil {
 		return fmt.Errorf("create message: %w", err)
+	}
+	return nil
+}
+
+func (c *CWClient) CreateMessageWithAttachment(ctx context.Context, baseURL string, accountID int, token string, conversationID int, content string, attachmentURL string, filename string) error {
+	// Download the file from the attachment URL (B2 public URL)
+	fileResp, err := c.httpClient.Get(attachmentURL)
+	if err != nil {
+		return fmt.Errorf("downloading attachment: %w", err)
+	}
+	defer fileResp.Body.Close()
+
+	if fileResp.StatusCode < 200 || fileResp.StatusCode >= 300 {
+		return fmt.Errorf("attachment download failed: status %d", fileResp.StatusCode)
+	}
+
+	fileData, err := io.ReadAll(fileResp.Body)
+	if err != nil {
+		return fmt.Errorf("reading attachment: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v1/accounts/%d/conversations/%d/messages", baseURL, accountID, conversationID)
+
+	err = RetryDo(ctx, 3, 1*time.Second, func() error {
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+
+		_ = writer.WriteField("content", content)
+		_ = writer.WriteField("message_type", "incoming")
+
+		part, partErr := writer.CreateFormFile("attachments[]", filename)
+		if partErr != nil {
+			return fmt.Errorf("creating form file: %w", partErr)
+		}
+		if _, copyErr := io.Copy(part, bytes.NewReader(fileData)); copyErr != nil {
+			return fmt.Errorf("writing attachment data: %w", copyErr)
+		}
+		writer.Close()
+
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &buf)
+		if reqErr != nil {
+			return fmt.Errorf("creating multipart request: %w", reqErr)
+		}
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("api_access_token", token)
+
+		resp, doErr := c.httpClient.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("sending multipart message: %w", doErr)
+		}
+		defer resp.Body.Close()
+
+		respBody, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return &HTTPError{StatusCode: resp.StatusCode, Message: string(respBody)}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("create message with attachment: %w", err)
 	}
 	return nil
 }

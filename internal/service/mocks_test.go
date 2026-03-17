@@ -42,9 +42,10 @@ func (m *mockInstagramClient) GetUserProfile(ctx context.Context, token string, 
 // ChatwootClient mock
 
 type mockChatwootClient struct {
-	CreateContactFn      func(ctx context.Context, baseURL string, accountID int, token string, req model.CWCreateContactRequest) (*model.CWCreateContactResponse, error)
-	CreateConversationFn func(ctx context.Context, baseURL string, accountID int, token string, req model.CWCreateConversationRequest) (*model.CWCreateConversationResponse, error)
-	CreateMessageFn      func(ctx context.Context, baseURL string, accountID int, token string, conversationID int, req model.CWCreateMessageRequest) error
+	CreateContactFn               func(ctx context.Context, baseURL string, accountID int, token string, req model.CWCreateContactRequest) (*model.CWCreateContactResponse, error)
+	CreateConversationFn          func(ctx context.Context, baseURL string, accountID int, token string, req model.CWCreateConversationRequest) (*model.CWCreateConversationResponse, error)
+	CreateMessageFn               func(ctx context.Context, baseURL string, accountID int, token string, conversationID int, req model.CWCreateMessageRequest) error
+	CreateMessageWithAttachmentFn func(ctx context.Context, baseURL string, accountID int, token string, conversationID int, content string, attachmentURL string, filename string) error
 }
 
 func (m *mockChatwootClient) CreateContact(ctx context.Context, baseURL string, accountID int, token string, req model.CWCreateContactRequest) (*model.CWCreateContactResponse, error) {
@@ -57,6 +58,10 @@ func (m *mockChatwootClient) CreateConversation(ctx context.Context, baseURL str
 
 func (m *mockChatwootClient) CreateMessage(ctx context.Context, baseURL string, accountID int, token string, conversationID int, req model.CWCreateMessageRequest) error {
 	return m.CreateMessageFn(ctx, baseURL, accountID, token, conversationID, req)
+}
+
+func (m *mockChatwootClient) CreateMessageWithAttachment(ctx context.Context, baseURL string, accountID int, token string, conversationID int, content string, attachmentURL string, filename string) error {
+	return m.CreateMessageWithAttachmentFn(ctx, baseURL, accountID, token, conversationID, content, attachmentURL, filename)
 }
 
 // AccountRepository mock
