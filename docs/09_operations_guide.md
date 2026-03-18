@@ -4,7 +4,59 @@
 
 Step-by-step instructions for managing instasae accounts in production.
 
-## Adding a new client account
+## Adding a new client account (OAuth flow — recommended)
+
+### Step 1 — Create Chatwoot inbox
+
+Follow the same steps as the manual flow below (Step 1).
+
+### Step 2 — Create partial account in instasae
+
+```bash
+curl -s -X POST https://instasae.imsdigitais.com/api/accounts \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_ADMIN_API_KEY" \
+  -d '{
+    "ig_page_id": "pending_oauth",
+    "ig_page_name": "Client Name",
+    "ig_access_token": "pending",
+    "chatwoot_base_url": "https://sae.imsdigitais.com",
+    "chatwoot_account_id": CHATWOOT_ACCOUNT_ID,
+    "chatwoot_inbox_id": CHATWOOT_INBOX_ID,
+    "chatwoot_api_token": "CHATWOOT_API_TOKEN",
+    "webhook_verify_token": "instasaet0k3nv3r1f1c4t1on"
+  }'
+```
+
+Note down the returned **account UUID**.
+
+### Step 3 — Send connect link to client
+
+Send this link to the client:
+```
+https://instasae.imsdigitais.com/connect?account_id=ACCOUNT_UUID
+```
+
+### Step 4 — Client authorizes
+
+The client opens the link, logs in with their Instagram professional account, and authorizes the app. The system automatically:
+- Exchanges the authorization code for a long-lived token (60 days)
+- Fetches the Instagram page ID and username
+- Updates the account with real credentials
+- Subscribes the page to webhooks
+
+### Step 5 — Verify
+
+```bash
+curl -s https://instasae.imsdigitais.com/api/accounts/ACCOUNT_UUID \
+  -H "X-API-Key: YOUR_ADMIN_API_KEY" | jq .
+```
+
+Confirm `ig_page_id` is no longer `"pending_oauth"` and `token_expires_at` is set.
+
+---
+
+## Adding a new client account (manual flow)
 
 ### Step 1 — Create Chatwoot inbox
 

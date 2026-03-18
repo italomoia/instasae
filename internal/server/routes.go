@@ -13,10 +13,16 @@ type Handlers struct {
 	WebhookChatwoot  *handler.WebhookChatwootHandler
 	AdminAccounts    *handler.AdminAccountsHandler
 	Health           *handler.HealthHandler
+	OAuth            *handler.OAuthHandler
 }
 
 func (s *Server) RegisterRoutes(h Handlers, logger *slog.Logger) {
 	s.router.Use(middleware.RequestLogging(logger))
+
+	// OAuth flow (public — client-facing)
+	s.router.Get("/connect", h.OAuth.HandleConnect)
+	s.router.Get("/oauth/callback", h.OAuth.HandleCallback)
+	s.router.Get("/oauth/success", h.OAuth.HandleSuccess)
 
 	// Webhooks
 	s.router.Route("/webhook", func(r chi.Router) {

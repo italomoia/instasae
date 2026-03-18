@@ -33,6 +33,11 @@ type Config struct {
 	B2PublicURL      string `env:"B2_PUBLIC_URL,required"`
 	B2Prefix         string `env:"B2_PREFIX" envDefault:"instasae"`
 
+	// OAuth (optional — OAuth flow works only when both are set)
+	InstagramAppID     string `env:"INSTAGRAM_APP_ID"`
+	InstagramAppSecret string `env:"INSTAGRAM_APP_SECRET"`
+	OAuthRedirectURI   string `env:"OAUTH_REDIRECT_URI"`
+
 	// Security
 	EncryptionKey      string `env:"ENCRYPTION_KEY,required"`
 	AdminAPIKey        string `env:"ADMIN_API_KEY,required"`

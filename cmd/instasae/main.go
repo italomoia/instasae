@@ -119,12 +119,29 @@ func main() {
 	tokenChecker := service.NewTokenChecker(accountRepo, logger, 6*time.Hour, 7*24*time.Hour)
 	tokenChecker.Start(ctx)
 
+	// OAuth (optional — only if credentials are configured)
+	var oauthHandler *handler.OAuthHandler
+	if cfg.InstagramAppID != "" && cfg.InstagramAppSecret != "" {
+		oauthSvc := service.NewOAuthService(
+			accountRepo, redisCache, httpClient,
+			cfg.InstagramAppID, cfg.InstagramAppSecret,
+			cfg.OAuthRedirectURI, cfg.MetaGraphAPIVersion,
+			logger,
+		)
+		oauthHandler = handler.NewOAuthHandler(oauthSvc)
+		slog.Info("OAuth flow enabled")
+	} else {
+		oauthHandler = handler.NewOAuthHandler(nil)
+		slog.Info("OAuth flow disabled (INSTAGRAM_APP_ID or INSTAGRAM_APP_SECRET not set)")
+	}
+
 	// Handlers
 	handlers := server.Handlers{
 		WebhookInstagram: handler.NewWebhookInstagramHandler(igSvc, cfg.WebhookVerifyToken),
 		WebhookChatwoot:  handler.NewWebhookChatwootHandler(cwSvc),
 		AdminAccounts:    handler.NewAdminAccountsHandler(accountSvc),
 		Health:           handler.NewHealthHandler(pool, redisClient),
+		OAuth:            oauthHandler,
 	}
 
 	// HTTP Server
