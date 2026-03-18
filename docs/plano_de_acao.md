@@ -225,14 +225,14 @@ Configurar Chatwoot inbox API, criar conta no instasae, testar fluxo ponta a pon
 
 ## Resumo de estimativas
 
-| Fase | Descrição | Estimativa |
+| Fase | Descrição | Status |
 |---|---|---|
 | Fase 0 | Documentação | ✅ Concluída |
-| Fase 1 | Fundação (esqueleto) | ~4-5h |
-| Fase 2 | Testes (RED) | ~4-5h |
-| Fase 3 | Implementação (GREEN) | ~8-10h |
-| Fase 4 | Robustez (V1) | ~4-5h |
-| Fase 5 | Deploy + refinamentos | ~3-4h |
-| **Total** | | **~23-29h** |
+| Fase 1 | Fundação (esqueleto) | ✅ Concluída |
+| Fase 2 | Testes (RED) | ✅ Concluída |
+| Fase 3 | Implementação (GREEN) | ✅ Concluída |
+| Fase 4 | Robustez (V1) | ✅ Concluída |
+| Fase 5 | Deploy + refinamentos | ✅ Concluída (V1 em produção) |
+| **Total** | | **MVP operacional** |
 
-Estimativas para desenvolvimento com Claude Code seguindo TDD.
+Desenvolvimento realizado com Claude Code seguindo TDD. V1 em produção desde março/2026.

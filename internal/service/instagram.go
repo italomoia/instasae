@@ -71,8 +71,6 @@ func (s *InstagramService) ValidateSignature(body []byte, signature string) bool
 // ProcessWebhook processes an Instagram webhook payload.
 // BR-WEBHOOK-06: Only "instagram" object is processed.
 func (s *InstagramService) ProcessWebhook(ctx context.Context, payload model.IGWebhookPayload) {
-	s.logger.Debug("processing webhook", "object", payload.Object, "entries", len(payload.Entry))
-
 	if payload.Object != "instagram" {
 		s.logger.Warn("ignoring non-instagram webhook object", "object", payload.Object)
 		return
@@ -86,8 +84,6 @@ func (s *InstagramService) ProcessWebhook(ctx context.Context, payload model.IGW
 }
 
 func (s *InstagramService) processMessage(ctx context.Context, igPageID string, messaging model.IGMessaging) {
-	s.logger.Debug("processing message", "ig_page_id", igPageID, "sender", messaging.Sender.ID, "has_message", messaging.Message != nil)
-
 	msg := messaging.Message
 	if msg == nil {
 		return

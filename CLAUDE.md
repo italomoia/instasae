@@ -136,6 +136,7 @@ OUTBOUND: Chatwoot callback POST → filter outgoing non-private →
 | docs/06_local_development.md | How to run locally |
 | docs/07_production_stack.md | Dockerfile, deploy, update process |
 | docs/08_external_integrations.md | Instagram API, Chatwoot API, B2 |
+| docs/09_operations_guide.md | Account onboarding, monitoring, token renewal |
 
 ## Common hurdles
 
@@ -145,10 +146,17 @@ OUTBOUND: Chatwoot callback POST → filter outgoing non-private →
 - **Docker Swarm:** VPS uses Docker Swarm, not plain docker-compose. Network is `IMSNet`, Traefik certresolver is `letsencryptresolver`. Deploy with `docker stack deploy`, update with `docker service update`.
 - **Redis DB indexes:** 0=default, 2=n8n, 8=evolution. instasae uses index 3.
 - **GHCR images:** Docker images are pushed to `ghcr.io/italomoia/instasae:latest`, not built locally on the VPS.
+- **Instagram App Secret for webhooks:** When using "Instagram API with Business Login", the webhook signature uses the Instagram App Secret (from the Instagram product page), NOT the Facebook App Secret (from App Settings > Basic). The Facebook App Secret caused invalid webhook signature on every webhook in production.
+- **Cache serialization and json:"-" tags:** Account model has `json:"-"` on token fields to hide them from API responses. The Redis cache was using `json.Marshal`, which stripped tokens. Fixed by switching to `encoding/gob` which ignores JSON tags.
+- **message_edit events:** Instagram sends `message_edit` events (not `message`) when the account owner sends DMs from the Instagram app itself. These have no sender/recipient/message fields. The code correctly skips them (`msg == nil`), but they can be confusing in logs.
+- **Swarm network not attachable:** Docker Swarm overlay networks don't allow `docker run --network`. Migrations must be run via `docker exec` on the postgres container or by making the network attachable.
+- **Webhook subscription can drop:** Instagram page webhook subscriptions can silently deactivate. Must re-subscribe via `POST /{page_id}/subscribed_apps`. V2 should add periodic subscription health check.
+- **HUMAN_AGENT tag requires App Review:** The tag is disabled by default (`ENABLE_HUMAN_AGENT_TAG=false`). Without it, replies work within 24h window only. Enable after Meta approves the permission.
 
 ## Design patterns
 
-*(filled during development)*
+- **gob for internal cache, json for API responses:** Account tokens use `json:"-"` to hide from HTTP responses, but `gob` encoding preserves all exported fields for Redis cache.
+- **Multipart form data for Chatwoot attachments:** Chatwoot Application API requires `multipart/form-data` with `attachments[]` field for inline media display. JSON API only supports text content.
 
 ## Post-implementation checklist
 

@@ -48,8 +48,6 @@ func (h *WebhookInstagramHandler) HandleWebhook(w http.ResponseWriter, r *http.R
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	slog.Debug("webhook body received", "length", len(body))
-
 	var payload model.IGWebhookPayload
 	if err := json.Unmarshal(body, &payload); err != nil {
 		preview := string(body)
@@ -60,8 +58,6 @@ func (h *WebhookInstagramHandler) HandleWebhook(w http.ResponseWriter, r *http.R
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-
-	slog.Debug("webhook payload parsed", "object", payload.Object, "entries", len(payload.Entry))
 
 	// BR-WEBHOOK-01: Respond 200 IMMEDIATELY, process async
 	w.WriteHeader(http.StatusOK)
